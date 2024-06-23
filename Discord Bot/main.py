@@ -53,17 +53,23 @@ async def on_message(message):
             return
 
         # Fetch player data from Hypixel API
-        hypixel_response = requests.get(f'https://api.hypixel.net/player?key={HYPIXEL_API_KEY}&uuid={uuid}')
+       hypixel_response = requests.get(f'https://api.hypixel.net/player?key={HYPIXEL_API_KEY}&uuid={uuid}')
         if hypixel_response.status_code == 200 and hypixel_response.json()['success']:
             player_data = hypixel_response.json()['player']
             player_name = player_data['displayname']
-            player_rank = player_data.get('rank', 'No rank')
-            player_network_level = player_data.get('networkLevel', 0)
+            player_online = player_data.get('lastLogin') > player_data.get('lastLogout')  # Online if last login is after last logout
+            player_rank = player_data.get('rank', player_data.get('newPackageRank', player_data.get('monthlyPackageRank', 'None')))
+            player_rank_color = player_data.get('rankPlusColor', 'None')  # Default to 'None' if no color is found
+            player_level = (player_data['networkExp'] / 10000) if 'networkExp' in player_data else 0  # Hypixel level is derived from network experience
+            player_karma = player_data.get('karma', 0)
             
             response_message = (
                 f"Player: {player_name}\n"
+                f"Online: {'Yes' if player_online else 'No'}\n"
                 f"Rank: {player_rank}\n"
-                f"Network Level: {player_network_level}\n"
+                f"Rank Color: {player_rank_color}\n"
+                f"Level: {player_level:.2f}\n"
+                f"Karma: {player_karma}\n"
             )
             await message.channel.send(response_message)
         else:
