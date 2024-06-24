@@ -1,0 +1,39 @@
+PLAN FOR THE DISCORD BOT 
+
+1:
+Write the basics:
+    - imports
+    - json file to store the hypixel api key and discord token
+    - ping command to test that the bot can respond and give an idea of latency
+    - ss evidence it in Screenshots
+
+2:
+Create a very basic user lookup command:
+    - Utilise the mojang api to get a players UUID from a name
+    - use the hypixel api to return the players rank and network level
+
+3:
+Create a more advanced user lookup:
+    - Player rank
+    - Online status (y/n)
+    - Player rank colour
+    - Player level
+    - Player Karma
+
+4:
+- Create a help command listing the different commands the user can do
+
+5:
+- Use discord embeds to make the user lookup look nicer
+
+6:
+- Modify the bots status to show users the help command
+
+7:
+- Use discord embeds to make the help command look nicer
+
+8:
+- Use @client.mention to bring up the help command when the bot is mentioned
+
+9:
+- Create a command to display the statistics of a user in a given gamemode
