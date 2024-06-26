@@ -63,7 +63,6 @@ async def on_ready():
 
 #USER JOIN / LEAVE MESSAGE
 
-## CENCOR FOR UPLOADDDDDDDD
 @bot.event
 async def on_member_join(member):
     channel = client.get_channel(1254537290110337036)
@@ -253,11 +252,6 @@ async def rankcheck_error(ctx, error):
         await ctx.channel.send(f'The command didnt work\n{error}')
 
 
-#BOT VOICE CHANNEL PURGE WHEN UPLOADING
-#
-# PURGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#
-#PURGE THE ILLITERATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 #Bot joins VC
 @bot.command(pass_context=True)
@@ -335,24 +329,6 @@ async def ban_error(ctx, error):
         await ctx.send("You don't have permission to ban people!")
 
 
-#message listener <-- integrated as part of aristotle bot, line 363.
-#@client.event
-#async def on_message(message):
-    #if message.author == bot.user:
-        #return
-    #parts = message.content.split(' ')
-    #for x in parts:
-        #if x == "Andy" or x == "andy":
-        #await message.channel.send(
-        #"We don't say that mans name around here...")
-        #await message.delete(delay=2)
-
-    #else:
-        #if mention in message.content:
-        #await message.channel.send(
-        #f'Hello {message.author.mention}! My prefix is .\nUse .help for a list of commands!'
-        #)
-    #await bot.process_commands(message)
 
 #ARTISTOTLE BOT
 quotes = True
@@ -443,7 +419,7 @@ async def aristotle(ctx):
 with open('aristotle_quotes.json', 'r') as f:
     getQuote = json.load(f)
 
-#makes sure link is VALID. 
+# makes sure youtube link is VALID
 def is_youtube(url):
     return 'youtube.com' in url or 'youtu.be' in url
 
@@ -463,12 +439,14 @@ def get_video_info(url):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
         try:
             info_dict = ydl.extract_info(url, download=False)
+            if 'entries' in info_dict:  # Check if it's a playlist
+                raise ValueError("Playlist URLs are not supported")
             return {'title': info_dict['title'], 'url': info_dict['url']}
         except Exception as e:
             print(f"Error extracting info from {url}: {e}")
             return None
 
-#actual play command
+#plays url with exception of PLAYLISTS
 @bot.command()
 async def play(ctx, *, url):
     if ctx.author.voice is None:
@@ -488,7 +466,7 @@ async def play(ctx, *, url):
 
         ctx.voice_client.stop()
 
-        # improves ffmpeg audio quality, removes video formatting.
+        # Define FFmpeg options to handle the audio stream
         ffmpeg_options = {
             'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
             'options': '-vn'
@@ -498,9 +476,9 @@ async def play(ctx, *, url):
         ctx.voice_client.play(audio_source, after=lambda e: print(f"Finished playing: {e}"))
         await ctx.send(f"Now playing: {video_info['title']}")
     else:
-        await ctx.send("Error fetching YouTube video information.")
+        await ctx.send("Error fetching YouTube video information or Playlists are not supported.")
 
-#skip command
+#skips current song
 @bot.command()
 async def skip(ctx):
     if ctx.voice_client:
@@ -509,7 +487,7 @@ async def skip(ctx):
     else:
         await ctx.send("Not playing any music right now.")
 
-#pause command
+#pauses current song
 @bot.command()
 async def pause(ctx):
     if ctx.voice_client and ctx.voice_client.is_playing():
@@ -518,7 +496,7 @@ async def pause(ctx):
     else:
         await ctx.send("Not playing any music or already paused.")
 
-#resume command
+#resumes paused song
 @bot.command()
 async def resume(ctx):
     if ctx.voice_client and ctx.voice_client.is_paused():
@@ -526,6 +504,28 @@ async def resume(ctx):
         await ctx.send("Resumed the music.")
     else:
         await ctx.send("Not paused or nothing to resume.")
+
+
+
+#checks if author is owner
+def is_owner(ctx):
+    return ctx.author.id == 971628298041970688 or ctx.author.id == 700781757187752036
+
+#murders billy
+@bot.command()
+@commands.check(is_owner)
+async def kill(ctx):
+    await ctx.send("i was kil")
+    await bot.close()
+    os.execv(sys.executable, ['python'] + sys.argv)
+
+@kill.error
+async def reboot_error(ctx, error):
+    if isinstance(error, commands.CheckFailure):
+        await ctx.send("You do not have permission to use this command.")
+
+
+
 
 
 
