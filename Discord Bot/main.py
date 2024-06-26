@@ -62,7 +62,6 @@ async def on_ready():
 
 #USER JOIN / LEAVE MESSAGE
 
-## CENCOR FOR UPLOADDDDDDDD
 @bot.event
 async def on_member_join(member):
     channel = client.get_channel(1254537290110337036)
@@ -252,12 +251,6 @@ async def rankcheck_error(ctx, error):
         await ctx.channel.send(f'The command didnt work\n{error}')
 
 
-#BOT VOICE CHANNEL PURGE WHEN UPLOADING
-#
-# PURGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#
-#PURGE THE ILLITERATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
 #Bot joins VC
 @bot.command(pass_context=True)
 async def join(ctx):
@@ -301,14 +294,14 @@ async def temp_join(ctx):
     else:
         await ctx.send("You are not in a voice channel, you must be in a voice channel to run this command!")
 
-
+#Bot user kick.
 @bot.command()
 @has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason=None):
     await member.kick(reason=reason)
     await ctx.send(f'User {member} has been kicked.')
 
-
+#Bot kick error 
 @kick.error
 async def kick_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
@@ -320,14 +313,14 @@ async def kick_error(ctx, error):
             color=discord.Color.dark_blue())
         await ctx.send(embed=embed)
 
-
+#Bot ban
 @bot.command()
 @has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason=None):
     await member.ban(reason=reason)
     await ctx.send(f'User {member} has been banned.')
 
-
+#Bot ban error
 @ban.error
 async def ban_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
