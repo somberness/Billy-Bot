@@ -22,6 +22,7 @@ from discord import opus
 from discord import FFmpegOpusAudio
 import time
 import random
+import yt_dlp as youtube_dl
 #SECRETS
 #DISCORD_TOKEN = os.environ['discord_bot_token']
 #HYPIXEL_API_KEY = os.environ['api_key']
@@ -62,6 +63,7 @@ async def on_ready():
 
 #USER JOIN / LEAVE MESSAGE
 
+## CENCOR FOR UPLOADDDDDDDD
 @bot.event
 async def on_member_join(member):
     channel = client.get_channel(1254537290110337036)
@@ -251,6 +253,12 @@ async def rankcheck_error(ctx, error):
         await ctx.channel.send(f'The command didnt work\n{error}')
 
 
+#BOT VOICE CHANNEL PURGE WHEN UPLOADING
+#
+# PURGE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#
+#PURGE THE ILLITERATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 #Bot joins VC
 @bot.command(pass_context=True)
 async def join(ctx):
@@ -294,14 +302,14 @@ async def temp_join(ctx):
     else:
         await ctx.send("You are not in a voice channel, you must be in a voice channel to run this command!")
 
-#Bot user kick.
+
 @bot.command()
 @has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason=None):
     await member.kick(reason=reason)
     await ctx.send(f'User {member} has been kicked.')
 
-#Bot kick error 
+
 @kick.error
 async def kick_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
@@ -313,14 +321,14 @@ async def kick_error(ctx, error):
             color=discord.Color.dark_blue())
         await ctx.send(embed=embed)
 
-#Bot ban
+
 @bot.command()
 @has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason=None):
     await member.ban(reason=reason)
     await ctx.send(f'User {member} has been banned.')
 
-#Bot ban error
+
 @ban.error
 async def ban_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
@@ -434,6 +442,90 @@ async def aristotle(ctx):
 
 with open('aristotle_quotes.json', 'r') as f:
     getQuote = json.load(f)
+
+#makes sure link is VALID. 
+def is_youtube(url):
+    return 'youtube.com' in url or 'youtu.be' in url
+
+# extracts video details from the 'chube
+def get_video_info(url):
+    ydl_opts = {
+        'format': 'bestaudio',
+        'noplaylist': True,
+        'quiet': True,
+        'default_search': 'auto',
+        'extract_flat': False,
+        'restrict_filenames': True,
+        'force_generic_extractor': False,
+        'geo_bypass': True,
+        'geo_bypass_country': 'US',
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info_dict = ydl.extract_info(url, download=False)
+            return {'title': info_dict['title'], 'url': info_dict['url']}
+        except Exception as e:
+            print(f"Error extracting info from {url}: {e}")
+            return None
+
+#actual play command
+@bot.command()
+async def play(ctx, *, url):
+    if ctx.author.voice is None:
+        return await ctx.send("You need to be in a voice channel to use this command!")
+
+    voice_channel = ctx.author.voice.channel
+
+    if not is_youtube(url):
+        return await ctx.send("Invalid YouTube URL!")
+
+    video_info = get_video_info(url)
+    if video_info:
+        if ctx.voice_client is None:
+            await voice_channel.connect()
+        elif ctx.voice_client.channel != voice_channel:
+            await ctx.voice_client.move_to(voice_channel)
+
+        ctx.voice_client.stop()
+
+        # improves ffmpeg audio quality, removes video formatting.
+        ffmpeg_options = {
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+            'options': '-vn'
+        }
+
+        audio_source = discord.FFmpegPCMAudio(video_info['url'], **ffmpeg_options)
+        ctx.voice_client.play(audio_source, after=lambda e: print(f"Finished playing: {e}"))
+        await ctx.send(f"Now playing: {video_info['title']}")
+    else:
+        await ctx.send("Error fetching YouTube video information.")
+
+#skip command
+@bot.command()
+async def skip(ctx):
+    if ctx.voice_client:
+        ctx.voice_client.stop()
+        await ctx.send("Skipped the song!")
+    else:
+        await ctx.send("Not playing any music right now.")
+
+#pause command
+@bot.command()
+async def pause(ctx):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+        ctx.voice_client.pause()
+        await ctx.send("Paused the music.")
+    else:
+        await ctx.send("Not playing any music or already paused.")
+
+#resume command
+@bot.command()
+async def resume(ctx):
+    if ctx.voice_client and ctx.voice_client.is_paused():
+        ctx.voice_client.resume()
+        await ctx.send("Resumed the music.")
+    else:
+        await ctx.send("Not paused or nothing to resume.")
 
 
 
