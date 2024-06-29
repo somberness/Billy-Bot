@@ -37,3 +37,83 @@ Create a more advanced user lookup:
 
 9:
 - Create a command to display the statistics of a user in a given gamemode
+
+30/06/24
+
+10:
+- Create an unban command
+
+11:
+- Add mute/unmute commands
+
+12:
+- Add warning commands
+
+13:
+- Add channel clear command
+
+14:
+- Add joke command
+
+15:
+- Add trivia
+
+16:
+- Add 8ball command
+
+17:
+- Add avatar command, displays user's avatar
+
+18:
+- Add userinfo command, displays userinfo
+
+19:
+- Add serverinfo command, displays current server statistics
+
+20:
+- Add poll command
+
+21:
+- Add remind me command, dm's user after specific time given
+
+22:
+- Add role management commands, auto-assign roles to new users
+
+23:
+- Add event scheduling, create/delete/list current events
+
+24:
+- Log mod actions, bans, kicks, warnings, mutes.
+
+25:
+- Log message deletions, edits
+
+26:
+- Log when a member joins/leaves
+
+27:
+- add economy system, balance, daily, shop, give.
+
+28:
+- Anti-spam & anti-raid functionality
+
+29:
+- server back-up functionality
+
+30:
+- potential web interface for managing bot
+
+31:
+- 
+
+32:
+-
+
+33:
+-
+
+34:
+-
+
+35:
+-
