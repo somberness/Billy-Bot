@@ -10,7 +10,7 @@ from discord.channel import TextChannel
 from discord.channel import VoiceChannel
 from discord.client import Client
 from discord.ext import *
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord.ext.commands import has_permissions, MissingPermissions
 from discord.guild import *
 from discord.member import *
@@ -26,6 +26,8 @@ import yt_dlp as youtube_dl
 from collections import deque
 import sys
 import re
+from datetime import datetime
+import shlex
 #SECRETS
 #DISCORD_TOKEN = os.environ['discord_bot_token']
 #HYPIXEL_API_KEY = os.environ['api_key']
@@ -52,6 +54,37 @@ bot.remove_command('help')
 
 ##--EVENTS--#
 
+@bot.event
+async def on_member_join(member):
+    channel = client.get_channel(1254537290110337036)
+    await channel.send(f'Welcome, {member}!')
+    await log_join_leave(member.guild, member, "joined")
+    global auto_assign_role_id
+
+    if auto_assign_role_id is None:
+        return  #if id isn't set, won't try giving role
+    print("User joined, couldn't assign role as it isn't set.")
+
+    role = member.guild.get_role(auto_assign_role_id)
+    if role is not None:
+        try:
+            await member.add_roles(role)
+            print(f"Assigned {role.name} to {member.display_name}")
+        except discord.Forbidden:
+            print(f"Missing permissions to assign {role.name} to {member.display_name}")
+        except discord.HTTPException as e:
+            print(f"Failed to assign {role.name} to {member.display_name}. Error: {e}")
+    else:
+        print(f"Role with ID {auto_assign_role_id} not found in server.")
+
+
+
+#USER LEAVE MESSAGE
+@bot.event
+async def on_member_remove(member):
+    channel = client.get_channel(1254537290110337036)
+    await channel.send(f'Goodbye, {member}!')
+    await log_join_leave(member.guild, member, "left")
 
 #ON READY LOGS
 @client.event
@@ -63,20 +96,16 @@ async def on_ready():
     await channel.send(embed=embed)
     await client.change_presence(activity=discord.Game('Type .help!'))
 
-
-#USER JOIN / LEAVE MESSAGE
+#checks to see if editted content is different before and after
 @bot.event
-async def on_member_join(member):
-    channel = client.get_channel(1254537290110337036)
-    await channel.send(
-        f'Welcome, {member}!')
+async def on_message_edit(before, after):
+    if before.content != after.content:
+        await log_message_edit(before, after)
 
-
+#checks to see if message is deleted
 @bot.event
-async def on_member_remove(member):
-    channel = client.get_channel(1254537290110337036)
-    await channel.send(f'Goodbye, {member}!')
-
+async def on_message_delete(message):
+    await log_message_delete(message)
 
 #--COMMANDS--#
 
@@ -398,7 +427,7 @@ async def on_message(message):
     else:
         if mention in message.content:
             await message.channel.send(
-                f'Hello {message.author.mention}! My prefix is .\nUse .help for a list of commands!'
+                f'Hello {message.author.mention}! My prefix is "."\nUse .help for a list of commands!'
             )
 
     # Ensure commands are still processed <-- IMPORTANT else whole bot BREAKS
@@ -563,20 +592,20 @@ async def resume(ctx):
         await ctx.send("Not paused or nothing to resume.")
 
 
-#checks if author is owner
-def is_owner(ctx):
-    return ctx.author.id == 971628298041970688 or ctx.author.id == 700781757187752036
+#checks if author is admin
+def is_admin(ctx):
+    return ctx.author.guild_permissions.administrator
 
-#murders billy
+#shuts down bot
 @bot.command()
-@commands.check(is_owner)
+@commands.check(is_admin)
 async def kill(ctx):
-    await ctx.send("i was kil")
+    await ctx.send("Shutting down the bot...")
     await bot.close()
-    os.execv(sys.executable, ['python'] + sys.argv)
 
+#checks for permission
 @kill.error
-async def reboot_error(ctx, error):
+async def kill_error(ctx, error):
     if isinstance(error, commands.CheckFailure):
         await ctx.send("You do not have permission to use this command.")
 
@@ -597,33 +626,30 @@ async def dm_error(ctx, error):
             await ctx.send(embed=embed)
         else:
             ctx.send(error)
-# Lock Channel
+#locks channel
 @bot.command(aliases=['Lock'])
 @has_permissions(manage_channels=True)
 async def lock( ctx, reason=None):
         await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-        embed=discord.Embed(title=f'Channel Locked', description=f'🔒 #{ctx.channel.name} has been locked. Reason: {reason} \nCode ripped off from Jedi :(', color=discord.Color.blue())
+        embed=discord.Embed(title=f'Channel Locked', description=f'🔒 #{ctx.channel.name} has been locked. Reason: {reason} \n', color=discord.Color.pink())
         embed.set_footer(icon_url=ctx.author.avatar,
                          text=f'Locked by {ctx.author.name}')
         await ctx.send(embed=embed)
-        channel = discord.utils.get(ctx.guild.channels, name="logs")
-        embed=discord.Embed(title=f'Channel locked', color=discord.Color.dark_blue())
-        embed.add_field(name='Channel name:', value=ctx.channel.mention, inline=False)
-        embed.add_field(name='Used by:', value=ctx.author.mention, inline=False)
-        await channel.send(embed=embed)
+        await log_lock(ctx.channel, ctx.author)
 @lock.error
 async def lock_error( ctx, error):
         if isinstance(error, commands.MissingPermissions):
             embed=discord.Embed(description='You are not allowed to use this command.', color=discord.Color.red())
             await ctx.channel.send (embed=embed)
 
-    # Unlock Channel
+#unlocks channel
 @bot.command(aliases=['Unlock'])
 @has_permissions(manage_channels=True)
 async def unlock( ctx,):
         await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-        embed=discord.Embed(title=f'Channel Unlocked', description=f'🔓 #{ctx.channel.name} has been unlocked.\nCode ripped off from Jedi :(', color=discord.Color.blue())
+        embed=discord.Embed(title=f'Channel Unlocked', description=f'🔓 #{ctx.channel.name} has been unlocked.\n', color=discord.Color.pink())
         await ctx.channel.send(embed=embed)
+        await log_unlock(ctx.channel, ctx.author)
 @unlock.error
 async def unlock_error( ctx, error):
         if isinstance(error, commands.MissingPermissions):
@@ -635,6 +661,7 @@ async def unlock_error( ctx, error):
 async def kick(ctx, member: discord.Member, *, reason=None):
     await member.kick(reason=reason)
     await ctx.send(f'User {member} has been kicked.')
+    await log_kick(ctx.guild, ctx.author, member, reason or "No reason specified")
 
 
 @kick.error
@@ -653,9 +680,10 @@ async def kick_error(ctx, error):
 async def ban(ctx, member: discord.Member, *, reason=None):
     await member.ban(reason=reason)
     await ctx.send(f'User {member} has been banned.')
+    await log_ban(ctx.guild, ctx.author, member, reason or "No reason specified")
 
 
-# Extracts user ID when the user is @mentioned, then assigns to string.
+#extracts user ID when @'d 
 def extract_user_id(mention: str) -> int:
     """
     Extracts the user ID from a mention string.
@@ -676,7 +704,7 @@ def extract_user_id(mention: str) -> int:
 #allows mod to ban user with @mention
 @bot.command()
 @has_permissions(ban_members=True)
-async def unban(ctx, user_mention: str):
+async def unban(ctx, user_mention: str, *, reason=None):
     try:
         user_id = extract_user_id(user_mention)
         user = await bot.fetch_user(user_id)
@@ -688,14 +716,15 @@ async def unban(ctx, user_mention: str):
         await ctx.send(f'Failed to unban user: {e}')
     except ValueError as e:
         await ctx.send(f'Error: {e}')
+    await log_unban(ctx.guild, ctx.author, user.name, reason or "No reason specified")
 
 @ban.error
 async def ban_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("You don't have permission to ban people!")
 
-# Muted role
-async def mute_user(ctx, member, duration=None):
+#muted role
+async def mute_user(ctx, member: discord.Member, duration=None, reason=None):
     muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
     if not muted_role:
         muted_role = await ctx.guild.create_role(name="Muted")
@@ -703,34 +732,39 @@ async def mute_user(ctx, member, duration=None):
             await channel.set_permissions(muted_role, speak=False, send_messages=False, read_message_history=True, read_messages=False)
     
     await member.add_roles(muted_role)
+    await log_mute(ctx.guild, ctx.author, member, duration, reason or "No reason specified")
     await ctx.send(f"{member.mention} has been muted for {duration} seconds.")
 
     if duration:
         await asyncio.sleep(duration)
         await member.remove_roles(muted_role)
         await ctx.send(f"{member.mention} has been unmuted after {duration} seconds.")
-#mutes specified member with duration
+
+#mute command with optional duration
 @bot.command()
-@has_permissions(manage_roles=True)
-async def mute(ctx, member: discord.Member, duration: int = None):
-    if duration == None:
+@commands.has_permissions(manage_roles=True)
+async def mute(ctx, member: discord.Member, duration: int = None, *, reason=None):
+    if duration is None:
         return await ctx.send("Please specify a duration.")
-    if not member:
+    if member is None:
         return await ctx.send("Please mention a user to mute.")
     if member == ctx.author:
         return await ctx.send("You cannot mute yourself.")
     
-    await mute_user(ctx, member, duration)
+    await mute_user(ctx, member, duration, reason)
+
 #unmutes muted user
 @bot.command()
 @has_permissions(manage_roles=True)
-async def unmute(ctx, member: discord.Member):
+async def unmute(ctx, member: discord.Member, reason=None):
     muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
     if not muted_role:
         return await ctx.send("Muted role does not exist.")
     
     await member.remove_roles(muted_role)
     await ctx.send(f"{member.mention} has been unmuted.")
+    await log_unmute(ctx.guild, ctx.author, member, reason or "No reason specified")
+    
 
 @mute.error
 @unmute.error
@@ -786,6 +820,7 @@ async def warn(ctx, member: discord.Member, *, reason="No reason provided."):
         await member.ban(reason=f'Reached 3 warnings ({reason})')
         await ctx.send(f'{member.mention} has been banned for reaching 3 warnings.')
         warnings[member.id] = 0  # resets warnings after banning
+    await log_warn(ctx.guild, ctx.author, member, reason or "No reason specified")
 
 #warning errors
 @warn.error
@@ -800,10 +835,11 @@ async def warn_error(ctx, error):
 #allows users to unwarn users
 @bot.command()
 @commands.has_permissions(kick_members=True)
-async def unwarn(ctx, member: discord.Member):
+async def unwarn(ctx, member: discord.Member, *, reason="None"):
     if member.id in warnings and warnings[member.id] > 0:
         warnings[member.id] -= 1
         await ctx.send(f'Removed one warning from {member.mention}. Current warnings: {warnings[member.id]}/3')
+        await log_unwarn(ctx.guild, ctx.author, member, reason or "No reason specified")
     else:
         await ctx.send(f'{member.mention} has no warnings to remove.')
 
@@ -864,6 +900,389 @@ async def joke_error(ctx, error):
     if isinstance(error, commands.CommandError):
         await ctx.send("Failed to fetch a joke. Please try again later.")
 
+# trivia url
+TRIVIA_API_URL = "https://opentdb.com/api.php"
+
+# retreives trivia questions from api :D
+def get_trivia_questions(amount=1):
+    params = {
+        "amount": amount,
+        "type": "multiple",  # multiple choice questions
+        "encode": "url3986"  # url encoding 
+    }
+    response = requests.get(TRIVIA_API_URL, params=params)
+    if response.status_code == 200:
+        return response.json()["results"]
+    else:
+        print(f"Failed to fetch trivia questions: {response.status_code}")
+        return None
+
+#trivia command (needs a little tinkering but works perfectly fine currently.)
+@bot.command()
+async def trivia(ctx, amount: int = 1):
+    """Starts a trivia game with the specified amount of questions."""
+    questions = get_trivia_questions(amount)
+    
+    if questions:
+        for index, question_data in enumerate(questions):
+            question = question_data["question"]
+            choices = question_data["incorrect_answers"] + [question_data["correct_answer"]]
+            random.shuffle(choices)
+            
+            # replaces HTML encoded characters with original symbols
+            question = requests.utils.unquote(question)
+            choices = [requests.utils.unquote(choice) for choice in choices]
+            
+            # creates formatted question and choices message
+            choices_text = "\n".join([f"{chr(65 + i)}: {choice}" for i, choice in enumerate(choices)])
+            question_message = f"**Question {index + 1}**: {question}\n\n{choices_text}"
+            
+            await ctx.send(question_message)
+            
+            # checks to see if answer is correct :D
+            def check_answer(m):
+                return m.author == ctx.author and m.channel == ctx.channel
+            
+            try:
+                response = await bot.wait_for('message', check=check_answer, timeout=30)
+                
+                # decodes the correct answer before checking
+                correct_answer_decoded = requests.utils.unquote(question_data["correct_answer"]).lower()
+                
+                # check if the user's answer matches the correct answer
+                if response.content.strip().lower() == correct_answer_decoded:
+                    await ctx.send("Correct!")
+                else:
+                    # debugging output to inspect values
+                    print(f"Choices: {choices}")
+                    print(f"Correct Answer Decoded: {correct_answer_decoded}")
+                    
+                    if correct_answer_decoded in choices:
+                        correct_answer_index = choices.index(correct_answer_decoded)
+                        await ctx.send(f"Wrong! The correct answer was {chr(65 + correct_answer_index)} ({choices[correct_answer_index]}).")
+                    else:
+                        await ctx.send(f"Error: Correct answer '{correct_answer_decoded}' not found in choices.")
+            except asyncio.TimeoutError:
+                await ctx.send("Time's up! Moving to the next question.")
+    
+    else:
+        await ctx.send("Failed to fetch trivia questions. Please try again later.")
+
+
+
+#7ball, pulls answers from json
+with open('responses.json', 'r') as f:
+    responses_data = json.load(f)
+    responses = responses_data['responses']
+
+#7ball cmd :D
+@bot.command(aliases=['8ball'])
+async def eightball(ctx, *, question):
+    await ctx.send(f"The 8Ball says...\n")
+    await asyncio.sleep(1)
+    await ctx.send(f"{random.choice(responses)}")
+
+#avatar display
+@bot.command()
+async def avatar(ctx, member: discord.Member = None): # discord.member = none by default if value is not given it returns authors (obviously)
+    if member is None:
+        member = ctx.author
+    embed = discord.Embed(title=f"{member.display_name}'s Avatar", color=discord.Color.pink())
+    embed.set_image(url=member.avatar.url)
+    await ctx.send(embed=embed)
+
+
+#member info
+@bot.command()
+async def userinfo(ctx, member: discord.Member = None):
+    if member is None:
+        member = ctx.author
+
+    roles = [role for role in member.roles if role != ctx.guild.default_role]
+
+    embed = discord.Embed(
+        title=f"{member.display_name}",
+        color=discord.Color.pink(),
+        timestamp=datetime.utcnow()
+    )
+    #embeds info about join dates, roles, names, ID, status and pfp.
+    embed.set_thumbnail(url=member.avatar.url)
+    embed.add_field(name="Username", value=member.name, inline=True)
+    embed.add_field(name="ID", value=member.id, inline=True)
+    embed.add_field(name="Status", value=member.status, inline=False)
+    embed.add_field(name="Top Role", value=member.top_role.mention, inline=True)
+    embed.add_field(name="Roles", value=" ".join([role.mention for role in roles]), inline=True)
+    embed.add_field(name="Joined Server", value=member.joined_at.strftime("%b %d, %Y"), inline=False)
+    embed.add_field(name="Joined Discord", value=member.created_at.strftime("%b %d, %Y"), inline=True)
+
+    await ctx.send(embed=embed)
+
+
+# server info embeds
+@bot.command()
+async def serverinfo(ctx):
+    guild = ctx.guild
+
+    embed = discord.Embed(
+        title=f"{guild.name}",
+        description=f"",
+        color=discord.Color.blue(),
+        timestamp=datetime.utcnow()
+    )
+
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+    else:
+        embed.set_thumbnail(url="")  # sets no icon if its not present or cant be retreived
+
+    embed.set_footer(text='Requested by ' + ctx.author.display_name, icon_url=ctx.author.avatar.url if ctx.author.avatar else "")
+
+    embed.add_field(name="Server Name", value=guild.name, inline=True)
+    embed.add_field(name="Server ID", value=guild.id, inline=True)
+    embed.add_field(name="Owner", value=guild.owner.mention, inline=False)
+    embed.add_field(name="Member Count:", value=guild.member_count, inline=False)
+    embed.add_field(name="Details", value=f"Region: {guild.preferred_locale}\n"
+                                          f"Creation Date: {guild.created_at.strftime('%b %d, %Y')}\n"
+                                          f"Number of Channels: {len(guild.channels)}"
+                                          f"Number of Roles: {len(guild.roles)}\n", inline=False)
+
+    await ctx.send(embed=embed)
+
+
+#standard poll, no timer
+@bot.command()
+async def poll(ctx, question: str, *options):
+    if len(options) < 2:
+        await ctx.send("You need at least two options to create a poll.")
+        return
+    if len(options) > 10:
+        await ctx.send("You can only provide up to 10 options.")
+        return
+
+    # Create an embed for the poll
+    embed = discord.Embed(
+        title=question,
+        description='\n'.join([f"{i+1}\u20E3 {option}" for i, option in enumerate(options)]),
+        color=discord.Color.pink()
+    )
+
+    poll_message = await ctx.send(embed=embed)
+
+    # Add reactions for voting
+    for i in range(len(options)):
+        await poll_message.add_reaction(f'{i+1}\u20E3')
+
+#timed poll
+@bot.command()
+async def timed_poll(ctx, duration: int, *, args):
+    parts = shlex.split(args)
+    
+    # extracts arguments part 1 = questions and further parts are options
+    question = parts[0]
+    options = parts[1:]
+
+    if len(options) < 2:
+        await ctx.send("You need at least two options to create a poll.")
+        return
+    if len(options) > 10:
+        await ctx.send("You can only provide up to 10 options.")
+        return
+
+    # creates embed for poll 
+    embed = discord.Embed(
+        title=question,
+        description='\n'.join([f"{i+1}\u20E3 {option}" for i, option in enumerate(options)]),
+        color=discord.Color.pink()
+    )
+
+    poll_message = await ctx.send(embed=embed)
+
+    # adds reactions for poll
+    for i in range(len(options)):
+        await poll_message.add_reaction(f'{i+1}\u20E3')
+
+    # countdown function
+    async def countdown():
+        for remaining_time in range(duration, 0, -1):
+            embed.set_footer(text=f"Time remaining: {remaining_time} seconds")
+            await poll_message.edit(embed=embed)
+            await asyncio.sleep(1)
+        await asyncio.sleep(1)  
+        await display_results(poll_message, question, options)  
+
+    async def display_results(poll_message, question, options):
+        
+        poll_message = await ctx.channel.fetch_message(poll_message.id)
+
+        # counts reactions
+        counts = [0] * len(options)
+        for reaction in poll_message.reactions:
+            if reaction.emoji in [f'{i+1}\u20E3' for i in range(len(options))]:
+                counts[int(reaction.emoji[0]) - 1] = reaction.count - 1  # -1 to exclude bot adding reactions
+
+        # calculate vote percentages
+        total_votes = sum(counts)
+        results = [f"{options[i]}: {counts[i] / total_votes * 100:.2f}%" for i in range(len(options))]
+
+        # results !!!
+        results_embed = discord.Embed(
+            title=f"{question}\nPoll Results:",
+            description='\n'.join(results),
+            color=discord.Color.green()
+        )
+
+        await ctx.send(embed=results_embed)
+
+    # starts countdown
+    await countdown()
+
+
+# remind me command
+@bot.command()
+async def remind_me(ctx, time_str: str, *, reminder_message): # allows user to specify time and message they'd like to receive e.g ".remind_me 5m Do something else" will dm and ping the user 5 minutes later with the message.
+    time_seconds = parse_time(time_str)
+
+    if time_seconds == 0:
+        await ctx.send("Please specify the time, use a valid format like `5s`, `10m`, or `1h`.")
+        return
+
+    # confirms bot has processed command
+    await ctx.send(f"Hey {ctx.author.mention}, I will remind you about '{reminder_message}' in {time_str}.")
+
+    # timer
+    await asyncio.sleep(time_seconds)
+
+    # pings & dms user
+    try:
+        await ctx.author.send(f"Here's your reminder: '{reminder_message}'")
+    except discord.Forbidden:
+        await ctx.send(f"Hey {ctx.author.mention}, I couldn't DM you the reminder. Please enable DMs from server members.") #if bot cant dm user it will ping them in discord letting them know, if user doesnt want to turn on dms the bot will server ping regardless.
+    else:
+        await ctx.send(f"Hey {ctx.author.mention}, here's your reminder: '{reminder_message}'")
+
+#function to determine specified time (seconds, mins and hours.)
+def parse_time(time_str):
+    regex = r'(?P<amount>\d+)(?P<unit>[smh])'
+    match = re.match(regex, time_str.lower())
+
+    if not match:
+        return 0
+
+    amount = int(match.group('amount'))
+    unit = match.group('unit')
+
+    if unit == 's':
+        return amount
+    elif unit == 'm':
+        return amount * 60
+    elif unit == 'h':
+        return amount * 3600
+    else:
+        return 0
+
+
+auto_assign_role_id = None
+
+#allows for user to change auto-assign role ID
+@bot.command()
+@commands.has_permissions(manage_roles=True)
+async def set_auto_assign_role(ctx, role_id: int):
+    global auto_assign_role_id
+    auto_assign_role_id = role_id
+    await ctx.send(f"Auto-assign role updated to Role ID: {role_id}")
+
+#error handling
+@set_auto_assign_role.error
+async def set_auto_assign_role_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("You don't have permission to use this command.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send("Please provide a role ID.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("Please provide a valid role ID.")
+
+#logs all mod commands in mod-logs channel
+mod_log_channel_name = "mod-logs"
+
+async def send_log_message(guild, message):
+    log_channel = discord.utils.get(guild.channels, name=mod_log_channel_name)
+    if log_channel and isinstance(log_channel, discord.TextChannel):
+        await log_channel.send(message)
+    else:
+        print(f"Error: Mod log channel '{mod_log_channel_name}' not found or is not a text channel.")
+
+async def log_mute(guild, moderator, member, duration, reason):
+    message = f"{moderator} muted {member} for {duration} seconds | Reason: {reason}"
+    await send_log_message(guild, message)
+
+async def log_unmute(guild, moderator, member, reason):
+    message = f"{moderator} unmuted {member} | Reason: {reason}"
+    await send_log_message(guild, message)
+
+async def log_warn(guild, moderator, member, reason):
+    message = f"{moderator} warned {member} | Reason: {reason}"
+    await send_log_message(guild, message)
+
+async def log_unwarn(guild, moderator, member, reason):
+    message = f"{moderator} unwarned {member} | Reason: {reason}"
+    await send_log_message(guild, message)
+
+async def log_ban(guild, moderator, member, reason):
+    message = f"{moderator} banned {member} | Reason: {reason}"
+    await send_log_message(guild, message)
+
+async def log_unban(guild, moderator, member, reason):
+    message = f"{moderator} unbanned {member} | Reason: {reason}"
+    await send_log_message(guild, message)
+
+async def log_kick(guild, moderator, member, reason):
+    message = f"{moderator} kicked {member} | Reason: {reason}"
+    await send_log_message(guild, message)
+
+async def log_lock(channel, moderator):
+    message = f"{moderator} locked {channel.mention}"
+    await send_log_message(channel.guild, message)
+
+async def log_unlock(channel, moderator):
+    message = f"{moderator} unlocked {channel.mention}"
+    await send_log_message(channel.guild, message)
+
+join_leave_log_channel_name = "join-leave-log" 
+
+async def log_join_leave(guild, member, action):
+    log_channel = discord.utils.get(guild.channels, name=join_leave_log_channel_name)
+    if log_channel:
+        await log_channel.send(f"{str(member)} has {action} the server.")
+    else:
+        print(f"Error: Log channel '{join_leave_log_channel_name}' not found.")
+
+
+#logs editted messages
+async def log_message_edit(before, after):
+    log_channel = discord.utils.get(before.guild.channels, name="message-logs")
+    if log_channel:
+        embed = discord.Embed(
+            title="Message Edited",
+            description=f"**Author:** {before.author.mention}\n"
+                        f"**Channel:** {before.channel.mention}\n\n"
+                        f"**Before:** {before.content}\n\n"
+                        f"**After:** {after.content}",
+            color=discord.Color.gold()
+        )
+        await log_channel.send(embed=embed)
+
+#logs deleted messages
+async def log_message_delete(message):
+    log_channel = discord.utils.get(message.guild.channels, name="message-logs")
+    if log_channel:
+        embed = discord.Embed(
+            title="Message Deleted",
+            description=f"**Author:** {message.author.mention}\n"
+                        f"**Channel:** {message.channel.mention}\n\n"
+                        f"**Content:** {message.content}",
+            color=discord.Color.red()
+        )
+        await log_channel.send(embed=embed)
 
 
 
