@@ -79,7 +79,7 @@ async def on_member_join(member):
 
 
 
-#USER LEAVE MESSAGE
+#USER LEAVE MESSAGE 
 @bot.event
 async def on_member_remove(member):
     channel = client.get_channel(1254537290110337036)
