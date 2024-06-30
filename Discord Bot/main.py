@@ -25,6 +25,7 @@ import random
 import yt_dlp as youtube_dl
 from collections import deque
 import sys
+import re
 #SECRETS
 #DISCORD_TOKEN = os.environ['discord_bot_token']
 #HYPIXEL_API_KEY = os.environ['api_key']
@@ -654,9 +655,230 @@ async def ban(ctx, member: discord.Member, *, reason=None):
     await ctx.send(f'User {member} has been banned.')
 
 
+# Extracts user ID when the user is @mentioned, then assigns to string.
+def extract_user_id(mention: str) -> int:
+    """
+    Extracts the user ID from a mention string.
+    
+    Parameters:
+        mention (str): The mention string in the format <@user_id>
+    
+    Returns:
+        int: The extracted user ID
+    """
+    match = re.match(r'<@!?(\d+)>', mention)
+    if match:
+        return int(match.group(1))
+    else:
+        raise ValueError("Invalid mention format")
+    
+
+#allows mod to ban user with @mention
+@bot.command()
+@has_permissions(ban_members=True)
+async def unban(ctx, user_mention: str):
+    try:
+        user_id = extract_user_id(user_mention)
+        user = await bot.fetch_user(user_id)
+        await ctx.guild.unban(user)
+        await ctx.send(f'User {user.name} has been unbanned.')
+    except discord.NotFound:
+        await ctx.send(f'User with ID {user_id} not found in the ban list.')
+    except discord.HTTPException as e:
+        await ctx.send(f'Failed to unban user: {e}')
+    except ValueError as e:
+        await ctx.send(f'Error: {e}')
+
 @ban.error
 async def ban_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
         await ctx.send("You don't have permission to ban people!")
+
+# Muted role
+async def mute_user(ctx, member, duration=None):
+    muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
+    if not muted_role:
+        muted_role = await ctx.guild.create_role(name="Muted")
+        for channel in ctx.guild.channels:
+            await channel.set_permissions(muted_role, speak=False, send_messages=False, read_message_history=True, read_messages=False)
+    
+    await member.add_roles(muted_role)
+    await ctx.send(f"{member.mention} has been muted for {duration} seconds.")
+
+    if duration:
+        await asyncio.sleep(duration)
+        await member.remove_roles(muted_role)
+        await ctx.send(f"{member.mention} has been unmuted after {duration} seconds.")
+#mutes specified member with duration
+@bot.command()
+@has_permissions(manage_roles=True)
+async def mute(ctx, member: discord.Member, duration: int = None):
+    if duration == None:
+        return await ctx.send("Please specify a duration.")
+    if not member:
+        return await ctx.send("Please mention a user to mute.")
+    if member == ctx.author:
+        return await ctx.send("You cannot mute yourself.")
+    
+    await mute_user(ctx, member, duration)
+#unmutes muted user
+@bot.command()
+@has_permissions(manage_roles=True)
+async def unmute(ctx, member: discord.Member):
+    muted_role = discord.utils.get(ctx.guild.roles, name="Muted")
+    if not muted_role:
+        return await ctx.send("Muted role does not exist.")
+    
+    await member.remove_roles(muted_role)
+    await ctx.send(f"{member.mention} has been unmuted.")
+
+@mute.error
+@unmute.error
+async def mute_unmute_error(ctx, error):
+    if isinstance(error, MissingPermissions):
+        await ctx.send("You do not have permission to use this command.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("Invalid user provided.")
+    else:
+        await ctx.send("An error occurred while trying to mute/unmute the user.")
+
+# Dictionary to store warnings per user !!!
+warnings = {}
+
+# allows for user to reset all warnings (should only be performed if bot crashed)
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def reset_warnings(ctx):
+    global warnings
+    
+    # Ask for confirmation
+    await ctx.send("Are you sure you want to reset all warnings? Type 'yes' to confirm.")
+    
+    def check(m):
+        return m.author == ctx.author and m.channel == ctx.channel
+
+    try:
+        confirmation = await bot.wait_for('message', check=check, timeout=15)
+        
+        if confirmation.content.lower() != 'yes':
+            await ctx.send("Reset operation canceled. Warnings were not reset.")
+            return
+        
+        warnings = {}
+        await ctx.send("All warnings have been reset.")
+    
+    except TimeoutError:
+        await ctx.send("Reset operation timed out. Warnings were not reset.")
+    except:
+        await ctx.send("An error occurred. Warnings were not reset.")
+
+#allows user to warn users max 3 warns before automatic ban
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def warn(ctx, member: discord.Member, *, reason="No reason provided."):
+    if member.id not in warnings:
+        warnings[member.id] = 0
+    
+    warnings[member.id] += 1
+    await ctx.send(f'{member.mention} has been warned ({warnings[member.id]}/3). Reason: {reason}')
+
+    if warnings[member.id] >= 3:
+        await member.ban(reason=f'Reached 3 warnings ({reason})')
+        await ctx.send(f'{member.mention} has been banned for reaching 3 warnings.')
+        warnings[member.id] = 0  # resets warnings after banning
+
+#warning errors
+@warn.error
+async def warn_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("You do not have permission to use this command.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("Invalid user provided.")
+    else:
+        await ctx.send("An error occurred while trying to warn the user.")
+
+#allows users to unwarn users
+@bot.command()
+@commands.has_permissions(kick_members=True)
+async def unwarn(ctx, member: discord.Member):
+    if member.id in warnings and warnings[member.id] > 0:
+        warnings[member.id] -= 1
+        await ctx.send(f'Removed one warning from {member.mention}. Current warnings: {warnings[member.id]}/3')
+    else:
+        await ctx.send(f'{member.mention} has no warnings to remove.')
+
+#unwarn error catch
+@unwarn.error
+async def unwarn_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("You do not have permission to use this command.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("Invalid user provided.")
+    else:
+        await ctx.send("An error occurred while trying to unwarn the user.")
+
+#allows users to see current warnings of @'d user
+@bot.command()
+async def warnings(ctx, member: discord.Member):
+    if member.id in warnings:
+        await ctx.send(f'{member.mention} has {warnings[member.id]} warnings.')
+    else:
+        await ctx.send(f'{member.mention} has no warnings.')
+
+#warnings error catch
+@warnings.error
+async def warnings_error(ctx, error):
+    if isinstance(error, commands.BadArgument):
+        await ctx.send("Invalid user provided.")
+
+#allows user to clear a specified number of messages
+@bot.command()
+@commands.has_permissions(manage_messages=True)
+async def clear(ctx, amount: int):
+    if amount <= 0:
+        return await ctx.send("Amount must be a positive number, stop trying to break me :sob:")
+
+    deleted = await ctx.channel.purge(limit=amount + 1)  # +1 to also delete the command invocation
+    await ctx.send(f"Cleared {len(deleted) - 1} message(s).")  # -1 to exclude the command itself
+
+# Load jokes from JSON file
+with open('jokes.json', 'r', encoding='utf-8') as file:
+    jokes_data = json.load(file)
+
+# dad jokes command
+@bot.command()
+async def joke(ctx):
+    jokes = jokes_data.get('jokes', [])
+    if jokes:
+        joke = random.choice(jokes)
+        if 'question' in joke and 'answer' in joke:
+            await ctx.send(f"**Q:** {joke['question']}\n**A:** {joke['answer']}")
+        else:
+            await ctx.send("Oops! Something went wrong with the joke format.")
+    else:
+        await ctx.send("No jokes found in the database.")
+
+#dad joke error catch
+@joke.error
+async def joke_error(ctx, error):
+    if isinstance(error, commands.CommandError):
+        await ctx.send("Failed to fetch a joke. Please try again later.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 client.run(DISCORD_TOKEN)
