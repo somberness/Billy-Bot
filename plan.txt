@@ -1,95 +1,93 @@
 PLAN FOR THE DISCORD BOT 
 
 1:
-Write the basics:
-    - imports
-    - json file to store the hypixel api key and discord token
-    - ping command to test that the bot can respond and give an idea of latency
-    - ss evidence it in Screenshots
+Write the basics:✔️
+    - imports ✔️
+    - json file to store the hypixel api key and discord token ✔️
+    - ping command to test that the bot can respond and give an idea of latency ✔️
+    - ss evidence it in Screenshots ✔️
 
 2:
-Create a very basic user lookup command:
-    - Utilise the mojang api to get a players UUID from a name
-    - use the hypixel api to return the players rank and network level
+Create a very basic user lookup command: ✔️
+    - Utilise the mojang api to get a players UUID from a name ✔️
+    - use the hypixel api to return the players rank and network level ✔️
 
 3:
-Create a more advanced user lookup:
-    - Player rank
-    - Online status (y/n)
-    - Player rank colour
-    - Player level
-    - Player Karma
+Create a more advanced user lookup: ✔️
+    - Player rank ✔️
+    - Online status (y/n) ✔️
+    - Player rank colour ✔️
+    - Player level ✔️
+    - Player Karma ✔️
 
 4:
-- Create a help command listing the different commands the user can do
+- Create a help command listing the different commands the user can do ✔️
 
 5:
-- Use discord embeds to make the user lookup look nicer
+- Use discord embeds to make the user lookup look nicer ✔️
 
 6:
-- Modify the bots status to show users the help command
+- Modify the bots status to show users the help command ✔️
 
 7:
-- Use discord embeds to make the help command look nicer
+- Use discord embeds to make the help command look nicer ✔️
 
 8:
-- Use @client.mention to bring up the help command when the bot is mentioned
+- Use @client.mention to bring up the help command when the bot is mentioned ✔️
 
 9:
-- Create a command to display the statistics of a user in a given gamemode
-
-30/06/24
+- Create a command to display the statistics of a user in a given gamemode ✔️
 
 10:
-- Create an unban command
+- Create an unban command ✔️ 30/06/24
 
 11:
-- Add mute/unmute commands
+- Add mute/unmute commands ✔️ 30/06/24
 
 12:
-- Add warning commands
+- Add warning commands and commands to reset warning dictionaries ✔️ 30/06/24
 
 13:
-- Add channel clear command
+- Add channel clear command ✔️ 30/06/24
 
 14:
-- Add joke command
+- Add joke command ✔️ 30/06/24
 
 15:
-- Add trivia
+- Add trivia ✔️ 30/06/24
 
 16:
-- Add 8ball command
+- Add 8ball command ✔️ 30/06/24
 
 17:
-- Add avatar command, displays user's avatar
+- Add avatar command, displays user's avatar ✔️ 30/06/24
 
 18:
-- Add userinfo command, displays userinfo
+- Add userinfo command, displays userinfo ✔️ 30/06/24
 
 19:
-- Add serverinfo command, displays current server statistics
+- Add serverinfo command, displays current server statistics ✔️ 30/06/24
 
 20:
-- Add poll command
+- Add poll command ✔️ 30/06/24
 
 21:
-- Add remind me command, dm's user after specific time given
+- Add remind me command, dm's user after specific time given ✔️ 30/06/24
 
 22:
-- Add role management commands, auto-assign roles to new users
+- Add role management commands, auto-assign roles to new users ✔️ 30/06/24
 
 23:
-- Add event scheduling, create/delete/list current events
+- Add event scheduling, create/delete/list current events - not sure if necessary with current event systems, will check back later.
 
 24:
-- Log mod actions, bans, kicks, warnings, mutes.
+- Log mod actions, bans, kicks, warnings, mutes. ✔️ 30/06/24
 
 25:
-- Log message deletions, edits
+- Log message deletions, edits ✔️ 30/06/24
 
 26:
-- Log when a member joins/leaves
+- Log when a member joins/leaves ✔️ 30/06/24
 
 27:
 - add economy system, balance, daily, shop, give.
@@ -101,13 +99,13 @@ Create a more advanced user lookup:
 - server back-up functionality
 
 30:
-- potential web interface for managing bot
+- potential web interface for managing bot?
 
 31:
-- 
+- add global functionality with role assignment & channel leave & welcome & warnings so it doesnt reset on bot crash.
 
 32:
--
+- create a setup command. Provide help with settings up log channels and other functionality.
 
 33:
 -
